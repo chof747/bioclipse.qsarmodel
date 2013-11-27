@@ -25,6 +25,7 @@ import net.bioclipse.qsar.ResponseType;
 import net.bioclipse.qsar.StructureType;
 import net.bioclipse.qsar.StructurelistType;
 import net.bioclipse.qsar.TypeType;
+import net.bioclipse.qsar.business.IQsarManager;
 import net.bioclipse.qsar.util.QsarAdapterFactory;
 import net.bioclipse.qsar.util.QsarResourceFactoryImpl;
 import net.sf.bibtexml.BibtexmlPackage;
@@ -52,6 +53,7 @@ public class QsarModelManager implements IBioclipseManager {
     private Resource qsarModelResource;
     
     private ICDKManager cdkManager;
+    private IQsarManager qsarManager;
 
 	private EditingDomain editingDomain;
 
@@ -72,6 +74,7 @@ public class QsarModelManager implements IBioclipseManager {
     	qsarModelResource = null;
     	
     	cdkManager = net.bioclipse.cdk.business.Activator.getDefault().getJavaCDKManager();
+    	qsarManager = net.bioclipse.qsar.ui.editors.
     	editingDomain = null;
     }    
     
@@ -146,7 +149,7 @@ public class QsarModelManager implements IBioclipseManager {
      * @param structure
      * @param name
      */
-    public String addStructure(IFile structure, String name) {
+    public String addStructure(IFile structure, String name, String responseValue) {
     	
     	QsarType qsarModel = getQsarModel();
     	
@@ -154,42 +157,9 @@ public class QsarModelManager implements IBioclipseManager {
     		//QSAR Model loaded
 	
 			//obtain the structure list
-			StructurelistType structureList = getQsarModel().getStructurelist();
 			
-			//Load structure to obtain name and id
-			try {
-				ICDKMolecule molecule = cdkManager.loadMolecule(structure);
-				
-				if (name != null) {
-					molecule.setName(name);
-				}
-				
-				//setup the structure
-				ResourceType resStructure = createResource(
-						structure.getFullPath().toString(), 
-						molecule);
-				StructureType molStructure = createStructure(molecule);
-				
-				CompoundCommand cCmd = new CompoundCommand();
-
-				//add the structure to the qsar model
-				cCmd.append(AddCommand.create(getEditingDomain(), 
-			              structureList, 
-			              QsarPackage.Literals.STRUCTURELIST_TYPE__RESOURCES, 
-			              resStructure));		
-			    cCmd.append(AddCommand.create(getEditingDomain(), 
-  					  resStructure, 
-  					  QsarPackage.Literals.RESOURCE_TYPE__STRUCTURE, 
-  					  molStructure));
-				cCmd.execute();
-				
-				return resStructure.getId();
-				
-			} catch (BioclipseException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-				return null;
-			}			
+			ICDKMolecule molecule = cdkManager.loadMolecule(structure);
+			molecule.getAtomContainer().setProperty("Response", responseValue);
 			
     	} else {
     		// no QSAR Model loaded
