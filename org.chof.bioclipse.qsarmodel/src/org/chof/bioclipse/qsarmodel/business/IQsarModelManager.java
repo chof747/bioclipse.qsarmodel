@@ -10,59 +10,120 @@
  ******************************************************************************/
 package org.chof.bioclipse.qsarmodel.business;
 
-import org.eclipse.core.resources.IFile;
-
 import net.bioclipse.core.PublishedClass;
 import net.bioclipse.core.PublishedMethod;
 import net.bioclipse.core.Recorded;
-import net.bioclipse.managers.business.GuiAction;
+import net.bioclipse.core.TestClasses;
+import net.bioclipse.core.TestMethods;
+import net.bioclipse.core.business.BioclipseException;
+import net.bioclipse.jobs.BioclipseUIJob;
 import net.bioclipse.managers.business.IBioclipseManager;
 
-@PublishedClass(
-    value="TODO: Describe the manager here."
-)
+import org.chof.bioclipse.qsarmodel.domain.QsarModelHandle;
+import org.eclipse.core.resources.IFile;
+
+@PublishedClass(value = "TODO: Describe the manager here.")
+@TestClasses("org.chof.bioclipse.qsarmodel.test.QsarModelManagerTest,"
+    + "org.chof.bioclipse.qsarmodel.test.AbstractQsarModelManagerPluginTest")
 public interface IQsarModelManager extends IBioclipseManager {
-	
-	@Recorded
-	@PublishedMethod(
-		params="String filePath",
-		methodSummary="Loads an existing QSAR model resoure which will be used for further operations")
-	public boolean load(String filePath);
-	
-	public boolean load(IFile file);
-	
-	@Recorded
-	@PublishedMethod(
-		params="",
-		methodSummary="Saves the current QSAR model")
-	public boolean save();
-	
-	@Recorded
-	@PublishedMethod(
-		params="Boolean saveChanges",
-		methodSummary="Closes the current QSAR Model")
-	public boolean close(Boolean saveChanges);
-	
-	@Recorded
-	@PublishedMethod(
-        params="String structurePath",
-        methodSummary="Adds a structure from a structure file")
-	public String addStructure(String structurePath);
-	public String addStructure(IFile structure);
-	
-	@Recorded
-	@PublishedMethod(
-		params="String structurePath, String name",
-		methodSummary="Adds a structure with a given name to the structure file")
-	public String addStructure(String structurePath, String name);
-	public String addStructure(IFile structure, String name);
-	
-	
-	@Recorded
-	@PublishedMethod(
-		params="String structureResource, String unit, String value",
-		methodSummary="Adds a response to the specified structure")
-	public boolean addResponse(String structureResource,
-			                   String unit,
-			                   String value);
+
+    @Recorded
+    @PublishedMethod(
+        params = "String filePath",
+        methodSummary = "Loads an existing QSAR model resoure which will be used for further operations")
+    @TestMethods("testLoad")
+    public
+        QsarModelHandle load(String filePath);
+
+    @TestMethods("testLoad_IFile")
+    public QsarModelHandle load(IFile file);
+
+    @Recorded
+    @PublishedMethod(params = "QsarModelHandle modelHandle",
+        methodSummary = "Saves the QSAR model provided by the model descriptor")
+    public
+        boolean save(QsarModelHandle modelHandle);
+
+    @Recorded
+    @PublishedMethod(params = "QsarModelHandle modelHandle",
+        methodSummary = "Removes all structures and responses stored in the ")
+    public Integer clear(QsarModelHandle modelHandle) throws BioclipseException;
+
+    public void
+        clear(QsarModelHandle modelHandle, BioclipseUIJob<Integer> uiJob)
+            throws BioclipseException;
+
+    @Recorded
+    @PublishedMethod(
+        params = "QsarModelHandle modelHandle, Boolean saveChanges",
+        methodSummary = "Closes the QSAR Model provided by the model descriptor")
+    public
+        QsarModelHandle close(QsarModelHandle modelHandle, Boolean saveChanges);
+
+    @Recorded
+    @PublishedMethod(
+        params = "QsarModelHandle modelHandle, String structurePath",
+        methodSummary = "Adds a structure from a structure file")
+    public String
+        addStructure(QsarModelHandle modelHandle, String structurePath)
+            throws BioclipseException;
+
+    public String addStructure(QsarModelHandle modelHandle, IFile structure)
+        throws BioclipseException;
+
+    public void addStructure(QsarModelHandle modelHandle,
+        String structurePath,
+        BioclipseUIJob<String> uiJob) throws BioclipseException;
+
+    public void addStructure(QsarModelHandle modelHandle,
+        IFile structure,
+        BioclipseUIJob<String> uiJob) throws BioclipseException;
+
+    @Recorded
+    @PublishedMethod(
+        params = "QsarModelHandle modelHandle, String structurePath, String responseValue",
+        methodSummary = "Adds a structure with a given response Value")
+    public
+        String addStructureWithValue(QsarModelHandle modelHandle,
+            String structurePath,
+            String responseValue) throws BioclipseException;
+
+    public String addStructureWithValue(QsarModelHandle modelHandle,
+        IFile structure,
+        String responseValue) throws BioclipseException;
+
+    public void addStructureWithValue(QsarModelHandle modelHandle,
+        String structurePath,
+        String responseValue,
+        BioclipseUIJob<String> uiJob) throws BioclipseException;
+
+    public void addStructureWithValue(QsarModelHandle modelHandle,
+        IFile structure,
+        String responseValue,
+        BioclipseUIJob<String> uiJob) throws BioclipseException;
+
+    @Recorded
+    @PublishedMethod(
+        params = "QsarModelHandle modelHandle, String structurePath, String propertyName",
+        methodSummary = "Adds a structure with and sets the response value to a "
+            + "specifc property of the molecule")
+    public
+        String addStructureWithProperty(QsarModelHandle modelHandle,
+            String structurePath,
+            String propertyName) throws BioclipseException;
+
+    public String addStructureWithProperty(QsarModelHandle modelHandle,
+        IFile structure,
+        String propertyName) throws BioclipseException;
+
+    public void addStructureWithProperty(QsarModelHandle modelHandle,
+        String structurePath,
+        String propertyName,
+        BioclipseUIJob<String> uiJob) throws BioclipseException;
+
+    public void addStructureWithProperty(QsarModelHandle modelHandle,
+        IFile structure,
+        String propertyName,
+        BioclipseUIJob<String> uiJob) throws BioclipseException;
+
 }

@@ -11,35 +11,37 @@
 package org.chof.bioclipse.qsarmodel.business;
 
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 
 import net.bioclipse.cdk.business.ICDKManager;
 import net.bioclipse.cdk.domain.ICDKMolecule;
 import net.bioclipse.core.business.BioclipseException;
+import net.bioclipse.jobs.IReturner;
 import net.bioclipse.managers.business.IBioclipseManager;
 import net.bioclipse.qsar.DocumentRoot;
-import net.bioclipse.qsar.QsarFactory;
 import net.bioclipse.qsar.QsarPackage;
 import net.bioclipse.qsar.QsarType;
 import net.bioclipse.qsar.ResourceType;
-import net.bioclipse.qsar.ResponseType;
-import net.bioclipse.qsar.StructureType;
 import net.bioclipse.qsar.StructurelistType;
-import net.bioclipse.qsar.TypeType;
 import net.bioclipse.qsar.business.IQsarManager;
 import net.bioclipse.qsar.util.QsarAdapterFactory;
 import net.bioclipse.qsar.util.QsarResourceFactoryImpl;
 import net.sf.bibtexml.BibtexmlPackage;
 
 import org.apache.log4j.Logger;
+import org.chof.bioclipse.qsarmodel.domain.QsarModelHandle;
 import org.eclipse.core.resources.IFile;
+import org.eclipse.core.resources.IResource;
+import org.eclipse.core.runtime.CoreException;
+import org.eclipse.core.runtime.IProgressMonitor;
+import org.eclipse.core.runtime.NullProgressMonitor;
 import org.eclipse.emf.common.command.BasicCommandStack;
-import org.eclipse.emf.common.command.CompoundCommand;
 import org.eclipse.emf.common.util.URI;
 import org.eclipse.emf.ecore.resource.Resource;
 import org.eclipse.emf.ecore.resource.ResourceSet;
 import org.eclipse.emf.ecore.resource.impl.ResourceSetImpl;
 import org.eclipse.emf.ecore.util.EcoreUtil;
-import org.eclipse.emf.edit.command.AddCommand;
 import org.eclipse.emf.edit.domain.AdapterFactoryEditingDomain;
 import org.eclipse.emf.edit.domain.EditingDomain;
 
@@ -48,9 +50,6 @@ public class QsarModelManager implements IBioclipseManager {
 
     @SuppressWarnings("unused")
 	private static final Logger logger = Logger.getLogger(QsarModelManager.class);
-    
-    private DocumentRoot qsarRoot;
-    private Resource qsarModelResource;
     
     private ICDKManager cdkManager;
     private IQsarManager qsarManager;
@@ -70,29 +69,200 @@ public class QsarModelManager implements IBioclipseManager {
      */
     public QsarModelManager() {
     	super();
-    	qsarRoot = null;
-    	qsarModelResource = null;
     	
     	cdkManager = net.bioclipse.cdk.business.Activator.getDefault().getJavaCDKManager();
-    	qsarManager = net.bioclipse.qsar.ui.editors.
+    	qsarManager = net.bioclipse.qsar.init.Activator.getDefault().getJavaQsarManager();
     	editingDomain = null;
     }    
     
-    /**
-     * Provides access to the qsar model loaded by file
-     * @return a reference to the qsar model or null if no model is loaded
-     */
-    protected QsarType getQsarModel() {
-    	if (qsarRoot != null) {
-    		return qsarRoot.getQsar();
-    	} else {
-    		return null;
-    	}
+    public QsarModelHandle load(final IFile file) {
+		
+		DocumentRoot qsarRoot = (DocumentRoot) obtainResource(file).getContents().get(0);
+		return new QsarModelHandle(qsarRoot, file);
+    }
+
+	/**
+	 * Obtains a concrete resource from a eclipse project resource handle 
+	 * represented by IResource
+	 * @param resource
+	 * @return the concrete resource handle
+	 */
+	private Resource obtainResource(final IResource resource) {
+		ResourceSet resourceSet = createQsarModelResourceSet();
+		
+		return resourceSet.getResource(
+		   URI.createURI(resource.getLocationURI().toString()), true);
+	}
+
+    public boolean save(QsarModelHandle modelHandle) {
+    	Resource resource = obtainResource(modelHandle.getResource());
+    	resource.getContents().clear();
+    	resource.getContents().add(modelHandle.getRoot());
+    	try {
+			resource.save(null);
+			return true;	
+		} catch (IOException e) {
+			e.printStackTrace();
+			return false;
+		}
     }
     
-    public boolean load(final IFile file) {
+    public QsarModelHandle close(QsarModelHandle modelHandle, Boolean saveChanges) {
+    	if (saveChanges) {
+    		save(modelHandle);
+    	}
+    	
+    	modelHandle.close();
+    	
+    	return modelHandle;
+    }
+    
+    /**
+     * Clears all structures and all responses
+     * @param modelHandle the descriptor for the model 
+     * @param returner the returner for bioclipse job handling
+     * @param monitor the monitor for bioclipse job handling
+     * @throws BioclipseException
+     */
+    public void clear(QsarModelHandle modelHandle, IReturner<Integer> returner,
+    		          IProgressMonitor monitor) throws BioclipseException {
+    	
+    	QsarType qsarModel = modelHandle.getModel();
+    	Integer result = new Integer(0);
+    	
+    	if (qsarModel != null) {
+    	
+        	if (monitor == null) {
+        		monitor = new NullProgressMonitor();
+        	}
+        	
+        	if (!monitor.isCanceled()) {
+        		qsarModel.getStructurelist().getResources().clear();
+        		qsarModel.getResponselist().getResponse().clear();
+        	}
+
+    	}
+    	
+    	returner.completeReturn(result);
+    }
+    
+    
+    /**
+     * Adds a structure only.
+     * 
+     * @param modelHandle the descriptor of the model to add a structure
+     * @param structure the structure to add to the qsar model
+     * @param returner the returner for bioclipse job handling
+     * @param monitor the monitor for bioclipse job handling
+     * @throws BioclipseException
+     */
+    public void addStructure(QsarModelHandle modelHandle, IFile structure, 
+    		                   IReturner<String> returner,
+    		                   IProgressMonitor monitor) throws BioclipseException {
+    	addStructureWithValue(modelHandle, structure, null,
+    			returner, monitor);
+    }
+    
+    /**
+     * Adds a structure to the qsar model with a given name
+     * @param structure
+     * @throws CoreException 
+     * @throws BioclipseException 
+     */
+    public void addStructureWithValue(QsarModelHandle modelHandle, 
+    		                 IFile structure, String responseValue,
+    		                 IReturner<String> returner,
+    		                 IProgressMonitor monitor) throws BioclipseException {
+    	
+		ICDKMolecule molecule = cdkManager.loadMolecule(structure);
+		String property = "Response";
+		molecule.getAtomContainer().setProperty(property, responseValue);
+		try {
+			cdkManager.saveMolecule(molecule, true);
+		} catch (CoreException e1) {
+			throw new BioclipseException("Could not save back the molecules file", e1);
+		}
+
+		addStructureToQSARModel(modelHandle, structure, returner, monitor, property);
+    }
+
+    /**
+     * Adds a structure to the qsar model with a given name
+     * @param structure
+     * @throws CoreException 
+     * @throws BioclipseException 
+     */
+    public void addStructureWithProperty(QsarModelHandle modelHandle, 
+    		                 IFile structure, String propertyName,
+    		                 IReturner<String> returner,
+    		                 IProgressMonitor monitor) throws BioclipseException {
+    	
+		addStructureToQSARModel(modelHandle, structure, returner, monitor, propertyName);
+    }
+
+	/**
+	 * @param structure
+	 * @param returner
+	 * @param monitor
+	 * @param property
+	 * @throws BioclipseException
+	 */
+	private void addStructureToQSARModel(QsarModelHandle modelHandle, 
+			IFile structure,
+			IReturner<String> returner, IProgressMonitor monitor,
+			Object property) throws BioclipseException {
 		
-        // Create a resource set to hold the resources.
+		QsarType qsarModel = modelHandle.getModel();
+    	
+    	if (qsarModel != null) {    		
+    		//QSAR Model loaded
+	
+        	StructurelistType structureList = qsarModel.getStructurelist();
+        	Map<IFile, Object> molprops=new HashMap<IFile, Object>();
+        	if (monitor == null) {
+        		monitor = new NullProgressMonitor();
+        	}
+    		
+    		//check if file exists in resource set of the model and skip it
+    		for (ResourceType existingRes : structureList.getResources()){
+                if (existingRes.getName().equals(structure.getName())){
+                    throw new UnsupportedOperationException(
+                                           "File: " + structure.getName() 
+                                         + " already exists in QSAR analysis.");
+                }
+            }			
+    		
+			molprops.put(structure, property);
+			
+            try {
+				qsarManager.addResourcesAndResponsesToQsarModel( 
+						qsarModel, 
+						getEditingDomain(), 
+				        molprops, 
+				        true, 
+				        monitor);
+				
+				returner.completeReturn(structure.getName());
+				
+			} catch (IOException e) {
+				throw new BioclipseException("Problem with IO of Resources", e);
+			} catch (CoreException e) {
+				throw new BioclipseException("Problem with cdk core", e);
+			}
+
+			
+    	} else {
+    		// no QSAR Model loaded
+			returner.completeReturn(null);
+    	}
+	}
+    
+	/**
+	 * Initializes the resource set for the qsar model
+	 * @return the initialized resource set
+	 */
+	public static ResourceSet createQsarModelResourceSet() {
+		// Create a resource set to hold the resources.
         ResourceSet resourceSet = new ResourceSetImpl();
 
         // Register the appropriate resource factory to handle all file extensions.
@@ -111,91 +281,9 @@ public class QsarModelManager implements IBioclipseManager {
          BibtexmlPackage.eINSTANCE);
 
         EcoreUtil.resolveAll( resourceSet );
-
-        // Get the URI of the model file.
-        URI fileURI = URI.createURI(file.getLocationURI().toString());
-
-        qsarModelResource = resourceSet.getResource(fileURI, true);
-		
-		qsarRoot = (DocumentRoot) qsarModelResource.getContents().get(0);
-		return true;
-    }
+		return resourceSet;
+	}
     
-    public boolean save() {
-    	qsarModelResource.getContents().clear();
-    	qsarModelResource.getContents().add(qsarRoot);
-    	try {
-			qsarModelResource.save(null);
-			return true;	
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-			return false;
-		}
-    }
-    
-    public boolean close(Boolean saveChanges) {
-    	//TODO: Implement close method
-    	return false;
-    }
-    
-    
-    public String addStructure(IFile structure) {
-    	return addStructure(structure, null);
-    }
-    
-    /**
-     * Adds a structure to the qsar model with a given name
-     * @param structure
-     * @param name
-     */
-    public String addStructure(IFile structure, String name, String responseValue) {
-    	
-    	QsarType qsarModel = getQsarModel();
-    	
-    	if (qsarModel != null) {    		
-    		//QSAR Model loaded
-	
-			//obtain the structure list
-			
-			ICDKMolecule molecule = cdkManager.loadMolecule(structure);
-			molecule.getAtomContainer().setProperty("Response", responseValue);
-			
-    	} else {
-    		// no QSAR Model loaded
-    		return null;
-    	}
-    }
-    
-    public boolean addResponse(String structureResource,
-			                   String unit,
-			                   String value) {
-    	
-    	QsarType qsarModel = getQsarModel();
-    	
-    	if (qsarModel != null) {    		   	
-    		//QSAR Model loaded
-    		    		
-    		ResponseType response=QsarFactory.eINSTANCE.createResponseType();
-    		response.setStructureID( structureResource);
-    		response.setValue(value);
-    		response.setUnit(unit);    		
-			CompoundCommand cCmd = new CompoundCommand();
-
-			//add the structure to the qsar model
-			cCmd.append(AddCommand.create(getEditingDomain(), 
-		              qsarModel.getResponselist(), 
-		              QsarPackage.Literals.RESPONSES_LIST_TYPE__RESPONSE, 
-		              response));		
-			cCmd.execute();
-    		
-    		return true;
-    	} else {
-    		//QSAR Model not loaded
-    		return false;
-    	}
-    }
-
 	/**
 	 * Checks wether the editing domain is already defined and returns it or 
 	 * sets it up
@@ -209,38 +297,5 @@ public class QsarModelManager implements IBioclipseManager {
 				new BasicCommandStack());
 		}
 		return editingDomain;
-	}
-
-    /**
-     * Creates a structure for a specific molecule
-     * @param molecule
-     * @return
-     * @throws BioclipseException
-     */
-	private StructureType createStructure(ICDKMolecule molecule)
-			throws BioclipseException {
-		StructureType molStructure = QsarFactory.eINSTANCE.createStructureType();
-		
-		molStructure.setId(molecule.getUID());
-		molStructure.setInchi(molecule.getInChIKey(null));
-		molStructure.setResourceindex(0);
-		return molStructure;
-	}
-
-    /**
-     * Creates a resource for a specific molecule in a specific file location 
-     * @param path the path to the molecule's file
-     * @param molecule a reference to the molecule
-     * @return
-     */
-	private ResourceType createResource(String path, ICDKMolecule molecule) {
-		
-		ResourceType resStructure=QsarFactory.eINSTANCE.createResourceType();
-		resStructure.setId("res-"+molecule.getUID());
-		resStructure.setName(molecule.getName());
-		resStructure.setFile(path);
-		resStructure.setType( TypeType.TEXT );
-		resStructure.setChecksum( "N/A" );
-		return resStructure;
 	}
 }

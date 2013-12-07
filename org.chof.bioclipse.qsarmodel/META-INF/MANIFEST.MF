@@ -5,7 +5,9 @@ Bundle-SymbolicName: org.chof.bioclipse.qsarmodel;singleton:=true
 Bundle-Version: 1.0.0.qualifier
 Bundle-Activator: org.chof.bioclipse.qsarmodel.Activator
 Bundle-Vendor: chof.org
-Export-Package: org.chof.bioclipse.qsarmodel, org.chof.bioclipse.qsarmodel.business
+Export-Package: org.chof.bioclipse.qsarmodel,
+ org.chof.bioclipse.qsarmodel.business,
+ org.chof.bioclipse.qsarmodel.domain
 Require-Bundle: org.eclipse.ui,
  org.eclipse.core.runtime,
  net.bioclipse.core,
